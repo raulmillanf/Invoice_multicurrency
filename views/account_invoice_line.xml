@@ -1,0 +1,18 @@
+<odoo>
+    <data>
+      <record id="invoice_multicurrency" model="ir.ui.view">
+          <field name="name">invoice_currency_base</field>
+          <field name="model">account.invoice.line</field>
+          <field name="inherit_id" ref="account.view_move_form"/>
+          <field name="arch" type="xml">
+            <xpath expr="//field[@name='price_unit']" position="before">
+             <field name="price_unit_currency"/>
+             <field name="price_subtotal_currency"/>
+    
+           </xpath>
+         </field>
+       </record>
+
+
+    </data>
+</odoo>
