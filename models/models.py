@@ -5,10 +5,11 @@ from odoo import models, fields, api
 class InvoiceMulticurrency(models.Model):
     _inherit = 'account.move.line'
      
-    price_unit_currency= fields.Float(string='Unit Price', digits='Product Price')
-    price_subtotal_currency = fields.Monetary(string='Subtotal', store=True, readonly=True, currency_field='always_set_currency_id')
-    price_total_currency = fields.Monetary(string='Total', store=True, readonly=True, currency_field='always_set_currency_id')
-    #amount_untaxed_currency = fields.Monetary(string='Untaxed Amount', store=True, readonly=True, tracking=True, compute='_compute_amount')
+    price_unit_currency= fields.Float(string='Precio unitario', digits='Product Price')
+    price_subtotal_currency = fields.Monetary(string='Subtotal', store=True, readonly=True, currency_field='always_set_currency_id_base')
+    price_total_currency = fields.Monetary(string='Total', store=True, readonly=True, currency_field='always_set_currency_id_base')
+    always_set_currency_id_base = fields.Many2one('res.currency', string='Moneda base', compute='_compute_always_set_currency_id_base')
+    #amount_untaxed_currency = fields.Monetary(string='Base imponible', store=True, readonly=True, tracking=True, compute='_compute_amount')
     #amount_total_currency = fields.Monetary(string='Total', store=True, readonly=True, compute='_compute_amount',inverse='_inverse_amount_total')
 
     def _get_computed_price_unit_currency(self):
@@ -57,7 +58,6 @@ class InvoiceMulticurrency(models.Model):
       
         res = {}
         price_unit_currency_wo_discount = price_unit_currency * (1 - (discount / 100.0))
-        subtotal_currency = self.price_subtotal_currency
         subtotal_currency = quantity * price_unit_currency_wo_discount
 
         if taxes:
@@ -91,16 +91,13 @@ class InvoiceMulticurrency(models.Model):
         else:
             sign = 1
         price_subtotal_currency *= sign
-        psubcurr = price_subtotal_currency
-
-        if psubcurr:
-            
-            return {
+       
+        return {
                 'amount_currency': 0.0,
                 'debit': price_subtotal_currency > 0.0 and price_subtotal_currency or 0.0,
                 'credit': price_subtotal_currency < 0.0 and -price_subtotal_currency or 0.0,
             }
-    @api.onchange('quantity', 'discount', 'price_unit', 'tax_ids')
+    @api.onchange('quantity', 'discount', 'price_unit_currency', 'tax_ids')
     def _onchange_price_subtotal_currency(self):
         for line in self:
             if not line.move_id.is_invoice(include_receipts=True):
@@ -108,6 +105,11 @@ class InvoiceMulticurrency(models.Model):
 
             line.update(line._get_price_total_and_subtotal_currency())
             line.update(line._get_fields_onchange_subtotal_cu())    
+    
+    @api.depends('currency_id')
+    def _compute_always_set_currency_id_base(self):
+        for line in self:
+            line.always_set_currency_id_base = line.company_currency_id
 
     def _get_fields_onchange_balance_cu(self, quantity=None, discount=None, balance=None, move_type=None, currency=None, taxes=None, price_subtotal_currency=None):
         self.ensure_one()
@@ -120,6 +122,22 @@ class InvoiceMulticurrency(models.Model):
             taxes=taxes or self.tax_ids,
             price_subtotal_currency=price_subtotal_currency or self.price_subtotal_currency,
         )
+        
+    #Apesar de que la moneda sea extranjera, se toma la moneda base para efectos contables.
+    #@api.depends('amount_untaxed_currency','amount_total_currency')
+    #def _get_accounting_on_base_currency(self, amount_untaxed_currency, amount_total_currency,amount_untaxed_signed,amount_total_signed):
+    #    amount_untaxed_currency = self.amount_untaxed_currency
+    #    amount_total_currency = self.amount_total_currency
+    #    amount_total_signed = self.amount_total_signed
+    #    amount_untaxed_currency = self.amount_untaxed_signed
+    #    company_currency = self.company_id.currency_id
+        
+    #    if self.currency_id and self.currency_id != company_currency:
+    #        amount_total_signed = amount_total_currency
+    #        amount_untaxed_signed = amount_untaxed_currency
+    #price_subtotal_currency._get_accounting_on_base_currency()
+    
+       
       
 
         
